@@ -1,10 +1,12 @@
 """FastAPI main application"""
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import engine, Base
+from app.database import engine, Base, get_db
 from app.routers import auth, sync
+from app import schemas, crud
 
 settings = get_settings()
 
@@ -53,6 +55,30 @@ def init_database():
         return {"status": "success", "message": "Tablas creadas correctamente"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.post("/test-register")
+def test_register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    """Endpoint de prueba para registro con detalle de errores"""
+    try:
+        # Verificar si existe
+        existing = crud.get_user_by_email(db, user.email)
+        if existing:
+            return {"status": "error", "message": "Email ya registrado"}
+        
+        # Crear usuario
+        new_user = crud.create_user(db, user)
+        return {
+            "status": "success", 
+            "user_id": new_user.id,
+            "email": new_user.email
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }
 
 @app.get("/debug-db")
 def debug_database():
