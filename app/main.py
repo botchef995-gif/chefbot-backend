@@ -44,3 +44,44 @@ def root():
 def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+@app.get("/init-db")
+def init_database():
+    """Inicializa la base de datos (solo para setup inicial)"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        return {"status": "success", "message": "Tablas creadas correctamente"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/debug-db")
+def debug_database():
+    """Debug de conexión a base de datos"""
+    from app.config import get_settings
+    settings = get_settings()
+    
+    db_url = settings.database_url
+    # Ocultar contraseña
+    if "@" in db_url:
+        parts = db_url.split("@")
+        db_url_masked = parts[0].split(":")[0] + ":***@" + parts[1]
+    else:
+        db_url_masked = db_url
+    
+    try:
+        # Probar conexión
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT 1"))
+            conn.commit()
+        return {
+            "database_url": db_url_masked,
+            "connection": "OK",
+            "tables_created": True
+        }
+    except Exception as e:
+        return {
+            "database_url": db_url_masked,
+            "connection": "FAILED",
+            "error": str(e)
+        }
